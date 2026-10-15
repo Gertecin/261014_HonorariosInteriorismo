@@ -6,6 +6,7 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary'
   fullWidth?: boolean
   type?: 'button' | 'submit'
+  disabled?: boolean
 }
 
 export default function Button({ 
@@ -13,16 +14,19 @@ export default function Button({
   onClick, 
   variant = 'primary',
   fullWidth = false,
-  type = 'button'
+  type = 'button',
+  disabled = false
 }: ButtonProps) {
   const baseClass = variant === 'primary' ? 'btn-primary' : 'btn-secondary'
   const widthClass = fullWidth ? 'w-full' : ''
+  const disabledClass = disabled ? 'opacity-50 cursor-not-allowed active:scale-100' : ''
   
   return (
     <button
       type={type}
       onClick={onClick}
-      className={`${baseClass} ${widthClass}`}
+      disabled={disabled}
+      className={`${baseClass} ${widthClass} ${disabledClass}`}
     >
       {children}
     </button>

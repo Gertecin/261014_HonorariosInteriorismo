@@ -6,7 +6,7 @@
 
 @layer base {
   body {
-    @apply bg-bianchi-white font-inter text-bianchi-cemento-dark antialiased;
+    @apply bg-bianchi-cemento-light font-inter text-bianchi-cemento-dark antialiased;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -16,14 +16,78 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-bianchi-terracota text-white font-futura font-semibold py-3 px-6 rounded-lg shadow-button hover:bg-bianchi-terracota-light transition-colors;
+    @apply bg-bianchi-terracota text-white font-futura font-semibold py-3 px-6 rounded-lg shadow-button hover:bg-bianchi-terracota-light transition-all duration-200 active:scale-95;
   }
   
   .btn-secondary {
-    @apply bg-bianchi-cemento-light text-bianchi-cemento-dark font-inter font-medium py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors;
+    @apply bg-bianchi-cemento-light text-bianchi-cemento-dark font-inter font-medium py-2 px-4 rounded-lg hover:bg-gray-200 transition-all duration-200 active:scale-95;
+  }
+  
+  .btn-terracota-soft {
+    @apply bg-bianchi-terracota/20 text-bianchi-terracota font-inter font-medium py-3 px-4 rounded-lg transition-colors;
+  }
+  
+  .btn-terracota-solid {
+    @apply bg-bianchi-terracota text-white font-inter font-medium py-3 px-4 rounded-lg hover:bg-bianchi-terracota-light transition-all duration-200 active:scale-95;
   }
   
   .card {
-    @apply bg-white border border-bianchi-cemento-light rounded-lg shadow-card p-4;
+    @apply bg-white border border-bianchi-cemento-light rounded-lg shadow-card p-4 transition-shadow duration-200 hover:shadow-md;
   }
+}
+
+@layer utilities {
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 500px;
+    }
+  }
+  
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out forwards;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.4s ease-out forwards;
+  }
+  
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+  
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
 }

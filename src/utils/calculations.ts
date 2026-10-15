@@ -4,7 +4,8 @@ import { Proyecto, TipoEspacio, EtapaProyecto } from '../types';
 export const calcularPropuesta = (
   tipoEspacio: TipoEspacio,
   superficie: number,
-  presupuestoObra: number
+  presupuestoObra: number,
+  porcentajeAnticipo: number = 30
 ): { honorarioTotal: number; anticipo: number; etapas: EtapaProyecto[] } => {
   const config = CONFIG_ETAPAS[tipoEspacio];
   const sumaPorcentajes = config.reduce((sum, etapa) => sum + etapa.porcentaje, 0);
@@ -25,17 +26,17 @@ export const calcularPropuesta = (
       nombre: etapaConfig.nombre,
       estado: 'Pendiente',
       honorarioCalculado: honorarioEtapa,
-      pagoAsociado: 0,
-      estaCobrado: false,
+      anticipoAsociado: 0,
+      pagoPendiente: 0,
+      tareasCompletadas: [],
     });
   });
 
-  const anticipo = honorarioTotal * 0.30;
-  const saldoRestante = honorarioTotal - anticipo;
+  const anticipo = honorarioTotal * (porcentajeAnticipo / 100);
 
   etapasCalculadas.forEach(etapa => {
-    const proporcion = etapa.honorarioCalculado / honorarioTotal;
-    etapa.pagoAsociado = saldoRestante * proporcion;
+    etapa.anticipoAsociado = etapa.honorarioCalculado * (anticipo / honorarioTotal);
+    etapa.pagoPendiente = etapa.honorarioCalculado - etapa.anticipoAsociado;
   });
 
   return { honorarioTotal, anticipo, etapas: etapasCalculadas };
@@ -46,48 +47,81 @@ export const aplicarCambioAlcance = (
   nuevaSuperficie: number,
   nuevoPresupuestoObra: number
 ): Proyecto => {
-  const { honorarioTotal: nuevoTotal, etapas: nuevasEtapasRaw } = calcularPropuesta(
-    proyectoActual.tipoEspacio,
-    nuevaSuperficie,
-    nuevoPresupuestoObra
-  );
+  const config = CONFIG_ETAPAS[proyectoActual.tipoEspacio];
+  const sumaPorcentajes = config.reduce((sum, etapa) => sum + etapa.porcentaje, 0);
 
-  const montoYaCobrado = (proyectoActual.anticipoCobrado ? proyectoActual.anticipo : 0) + 
-    proyectoActual.etapas.reduce((sum, e) => e.estaCobrado ? sum + e.pagoAsociado : 0, 0);
+  let nuevoHonorarioTotal = 0;
+  const nuevasEtapas: EtapaProyecto[] = [];
 
-  const nuevoSaldoPendiente = nuevoTotal - montoYaCobrado;
+  // Calcular porcentaje de anticipo original (por si no está cobrado)
+  const porcentajeAnticipoOriginal = proyectoActual.honorarioTotal > 0 
+    ? (proyectoActual.anticipo / proyectoActual.honorarioTotal) * 100 
+    : 30;
 
-  const etapasNoCobradas = nuevasEtapasRaw.filter(e => {
-    const etapaVieja = proyectoActual.etapas.find(ve => ve.nombre === e.nombre);
-    return !etapaVieja?.estaCobrado;
-  });
+  proyectoActual.etapas.forEach((etapaVieja) => {
+    const configEtapa = config.find(e => e.nombre === etapaVieja.nombre);
+    if (!configEtapa) return;
 
-  const sumaHonorariosNoCobrados = etapasNoCobradas.reduce((sum, e) => sum + e.honorarioCalculado, 0);
-
-  const etapasFinales = proyectoActual.etapas.map(etapaVieja => {
-    if (etapaVieja.estaCobrado) {
-      return etapaVieja;
+    // Si la etapa está cobrada, mantener todo intacto
+    if (etapaVieja.estado === 'Cobrada') {
+      nuevoHonorarioTotal += etapaVieja.honorarioCalculado;
+      nuevasEtapas.push(etapaVieja);
+      return;
     }
-    
-    const etapaNuevaRaw = nuevasEtapasRaw.find(e => e.nombre === etapaVieja.nombre)!;
-    const proporcion = sumaHonorariosNoCobrados > 0 ? etapaNuevaRaw.honorarioCalculado / sumaHonorariosNoCobrados : 0;
-    
-    return {
+
+    // Recalcular honorario de la etapa
+    const honorarioPorPorcentaje = nuevoPresupuestoObra * (configEtapa.porcentaje / 100);
+    const pesoEtapa = configEtapa.porcentaje / sumaPorcentajes;
+    const honorarioPorMinimo = nuevaSuperficie * MINIMO_POR_M2_TOTAL * pesoEtapa;
+    const nuevoHonorario = Math.max(honorarioPorPorcentaje, honorarioPorMinimo);
+
+    nuevoHonorarioTotal += nuevoHonorario;
+
+    // Si el anticipo ya está cobrado, mantener el anticipoAsociado original
+    // Si no está cobrado, recalcularlo con el nuevo honorario
+    const nuevoAnticipoAsociado = proyectoActual.anticipoCobrado 
+      ? etapaVieja.anticipoAsociado 
+      : nuevoHonorario * (porcentajeAnticipoOriginal / 100);
+
+    nuevasEtapas.push({
       ...etapaVieja,
-      honorarioCalculado: etapaNuevaRaw.honorarioCalculado,
-      pagoAsociado: nuevoSaldoPendiente * proporcion,
-    };
+      honorarioCalculado: nuevoHonorario,
+      anticipoAsociado: nuevoAnticipoAsociado,
+      pagoPendiente: nuevoHonorario - nuevoAnticipoAsociado,
+    });
   });
+
+  // Recalcular anticipo total si no está cobrado
+  const nuevoAnticipo = proyectoActual.anticipoCobrado 
+    ? proyectoActual.anticipo 
+    : nuevoHonorarioTotal * (porcentajeAnticipoOriginal / 100);
 
   return {
     ...proyectoActual,
     superficie: nuevaSuperficie,
     presupuestoObra: nuevoPresupuestoObra,
-    honorarioTotal: nuevoTotal,
-    etapas: etapasFinales,
+    honorarioTotal: nuevoHonorarioTotal,
+    anticipo: nuevoAnticipo,
+    etapas: nuevasEtapas,
     historialCambios: [
       ...proyectoActual.historialCambios,
       `Cambio de alcance: Superficie ${nuevaSuperficie}m², Presupuesto $${nuevoPresupuestoObra.toLocaleString()}`
     ]
   };
+};
+
+export const calcularSaldoPendiente = (proyecto: Proyecto): number => {
+  const anticipoPendiente = proyecto.anticipoCobrado ? 0 : proyecto.anticipo;
+  const etapasPendientes = proyecto.etapas
+    .filter(e => e.estado !== 'Cobrada')
+    .reduce((sum, e) => sum + e.pagoPendiente, 0);
+  return anticipoPendiente + etapasPendientes;
+};
+
+export const calcularTotalCobrado = (proyecto: Proyecto): number => {
+  const anticipoCobrado = proyecto.anticipoCobrado ? proyecto.anticipo : 0;
+  const etapasCobradas = proyecto.etapas
+    .filter(e => e.estado === 'Cobrada')
+    .reduce((sum, e) => sum + e.honorarioCalculado, 0);
+  return anticipoCobrado + etapasCobradas;
 };
